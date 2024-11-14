@@ -50,7 +50,7 @@ def advection(u, v):
     return nu, nv
 
 
-def show():
+def show_test():
     print(u)
     print()
     print(nu)
@@ -76,4 +76,4 @@ nu, nv = advection(u, v)
 
 
 if __name__ == '__main__':
-    show()
+    show_test()
