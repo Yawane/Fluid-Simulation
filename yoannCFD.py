@@ -1,16 +1,15 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from time import time
-from numba import jit
 
 
-def apply_boundary_conditions(horizontal_field, vertical_field):
+
+def apply_boundary_conditions(horizontal_field: np.ndarray, vertical_field: np.ndarray) -> None:
     """
     Apply no-slip boundary conditions to velocity fields.
 
-    Parameters:
-        horizontal_field (np.ndarray): 2D array representing the horizontal velocity component (u).
-        vertical_field (np.ndarray): 2D array representing the vertical velocity component (v).
+    :param horizontal_field: 2D array representing the horizontal velocity component (u).
+    :param vertical_field: 2D array representing the vertical velocity component (v).
 
     Modifies:
         horizontal_field: Updates the boundary rows to match the adjacent interior rows.
@@ -28,18 +27,16 @@ def apply_boundary_conditions(horizontal_field, vertical_field):
     print(f"\t(apply_boundary_conditions)->\t{end_time - start_time:.4f} seconds")
 
 
-def interpolate(field, position, grid_spacing, max_index):
+def interpolate(field: np.ndarray, position: float, grid_spacing: float, max_index: int) -> np.ndarray:
     """
        Perform linear interpolation for a 1D field.
 
-       Parameters:
-           field (np.ndarray): 1D array representing the field values.
-           position (float): Position at which to interpolate.
-           grid_spacing (float): Spacing between grid points.
-           max_index (int): Maximum valid index for interpolation.
+       :param field: 1D array representing the field values.
+       :param position: Position at which to interpolate.
+       :param grid_spacing: Spacing between grid points.
+       :param max_index: Maximum valid index for interpolation.
 
-       Returns:
-           float: Interpolated field value.
+       :return: Interpolated field value.
        """
     index = int(position // grid_spacing)
     weight = (position % grid_spacing) / grid_spacing
@@ -49,18 +46,16 @@ def interpolate(field, position, grid_spacing, max_index):
     return (1 - weight) * field[index] + weight * field[index + 1]
 
 
-def advect_component(field, grid_spacing, time_step, axis_size):
+def advect_component(field: np.ndarray, grid_spacing: float, time_step: float, axis_size: int) -> np.ndarray:
     """
     Perform advection for a single velocity component.
 
-    Parameters:
-        field (np.ndarray): 2D array representing the velocity component (u or v).
-        grid_spacing (float): Spatial grid spacing (dx or dy).
-        time_step (float): Time step for the simulation.
-        axis_size (int): Size of the field along the advection axis.
+    :param field: 2D array representing the velocity component (u or v).
+    :param grid_spacing: Spacing between grid points.
+    :param time_step: Time step for the simulation.
+    :param axis_size: Size of the field along the advection axis.
 
-    Returns:
-        np.ndarray: Updated velocity component after advection.
+    :return: Updated velocity component after advection.
     """
     start_time = time()
     new_field = np.zeros_like(field)
@@ -88,19 +83,18 @@ def advect_component(field, grid_spacing, time_step, axis_size):
     return new_field
 
 
-def advection(horizontal_field, vertical_field, grid_spacing, delta_y, time_step):
+def advection(horizontal_field: np.ndarray, vertical_field: np.ndarray, grid_spacing: float, delta_y: float, time_step: float) -> tuple:
     """
     Perform the advection step for horizontal and vertical velocity fields.
 
     Parameters:
-        horizontal_field (np.ndarray): 2D array representing the horizontal velocity component (u).
-        vertical_field (np.ndarray): 2D array representing the vertical velocity component (v).
-        grid_spacing (float): Grid spacing in the x direction.
-        delta_y (float): Grid spacing in the y direction.
-        time_step (float): Time step for the simulation.
+        :param horizontal_field: 2D array representing the horizontal velocity component (u).
+        :param vertical_field: 2D array representing the vertical velocity component (v).
+        :param grid_spacing: Spacing between grid points.
+        :param delta_y: Spacing between grid points in y-axis.
+        :param time_step: Time step for the simulation.
 
-    Returns:
-        tuple: Updated (horizontal_field, vertical_field) after advection.
+        :return: Updated (horizontal_field, vertical_field) after advection.
     """
     start_time = time()
     nu = advect_component(horizontal_field, grid_spacing, time_step, horizontal_field.shape[1])
@@ -113,9 +107,13 @@ def advection(horizontal_field, vertical_field, grid_spacing, delta_y, time_step
     return nu, nv
 
 
-def build_matrix_A(grid_size):
+def build_matrix_A(grid_size: int) -> np.ndarray:
     """
     Build the sparse matrix A for the pressure gradient calculation.
+
+    :param grid_size: Number of grid points along one axis.
+
+    :return: matrix A
     """
     start_time = time()
     n = grid_size ** 2
@@ -139,9 +137,15 @@ def build_matrix_A(grid_size):
     return A
 
 
-def build_vector_b(horizontal_field, vertical_field, grid_size):
+def build_vector_b(horizontal_field: np.ndarray, vertical_field: np.ndarray, grid_size: int) -> np.ndarray:
     """
     Build the vector b from the velocity fields.
+
+    :param horizontal_field: 2D array representing the horizontal velocity component (u).
+    :param vertical_field: 2D array representing the vertical velocity component (v).
+    :param grid_size: Number of grid points along one axis.
+
+    :return: vector b
     """
     start_time = time()
     b = np.zeros(grid_size ** 2, dtype='float64')
@@ -156,20 +160,18 @@ def build_vector_b(horizontal_field, vertical_field, grid_size):
     return b
 
 
-def pressure_gradient(horizontal_field, vertical_field, grid_size, grid_spacing, time_step, rho):
+def pressure_gradient(horizontal_field: np.ndarray, vertical_field: np.ndarray, grid_size: int, grid_spacing: float, time_step: float, rho: float) -> np.ndarray:
     """
     Compute the pressure gradient correction term for the velocity fields.
 
-    Parameters:
-        horizontal_field (np.ndarray): 2D array representing the horizontal velocity component (u).
-        vertical_field (np.ndarray): 2D array representing the vertical velocity component (v).
-        grid_size (int): Number of grid points along one axis.
-        grid_spacing (float): Spatial grid spacing.
-        time_step (float): Time step for the simulation.
-        rho (float): Fluid density.
+    :param horizontal_field: 2D array representing the horizontal velocity component (u).
+    :param vertical_field: 2D array representing the vertical velocity component (v).
+    :param grid_size: Number of grid points along one axis.
+    :param grid_spacing: Spacing between grid points.
+    :param time_step: Time step for the simulation.
+    :param rho: Fluid density.
 
-    Returns:
-        np.ndarray: 2D array representing the pressure gradient correction.
+    :return: 2D array representing the pressure gradient correction.
     """
     start_time = time()
     A = build_matrix_A(grid_size)
@@ -184,45 +186,46 @@ def pressure_gradient(horizontal_field, vertical_field, grid_size, grid_spacing,
     return delta_p
 
 
-def compute_divergence(vu, vv, grid_size, grid_spacing):
+def compute_divergence(horizontal_field: np.ndarray, vertical_field: np.ndarray, grid_size: int, grid_spacing: float) -> np.ndarray:
     """
     Computes the divergence of the velocity field.
 
-    Parameters:
-        vu (np.ndarray): The horizontal velocity component (u).
-        vv (np.ndarray): The vertical velocity component (v).
-        grid_size (int): Number of cells along one dimension of the computational grid.
-        grid_spacing (float): Grid spacing.
+    :param horizontal_field: 2D array representing the horizontal velocity component (u).
+    :param vertical_field: 2D array representing the vertical velocity component (v).
+    :param grid_size: umber of grid points along one axis.
+    :param grid_spacing: Spacing between grid points.
 
-    Returns:
-        np.ndarray: The divergence field.
+    :return: The divergence field.
     """
     start_time = time()
     divergence = np.zeros((grid_size, grid_size), dtype='float64')
     for j in range(grid_size):
         for i in range(grid_size):
             divergence[i, j] = (
-                (vu[i + 1, j + 1] - vu[i + 1, j]) +
-                (vv[i + 1, j + 1] - vv[i, j + 1])
+                                       (horizontal_field[i + 1, j + 1] - horizontal_field[i + 1, j]) +
+                                       (vertical_field[i + 1, j + 1] - vertical_field[i, j + 1])
             ) / grid_spacing
     end_time = time()
     print(f"\t(compute_divergence)->\t{end_time - start_time:.4f} seconds")
     return divergence
 
 
-def apply_pressure_correction(horizontal_field, vertical_field, pressure, grid_size, grid_spacing, time_step, rho, boundary_conditions):
+def apply_pressure_correction(horizontal_field: np.ndarray, vertical_field: np.ndarray, pressure: np.ndarray, grid_size: int, grid_spacing: float, time_step: float,
+                              rho: float,
+                              boundary_conditions: callable) -> None:
     """
     Updates the velocity field based on the pressure gradient.
 
-    Parameters:
-        horizontal_field (np.ndarray): The horizontal velocity component (u).
-        vertical_field (np.ndarray): The vertical velocity component (v).
-        pressure (np.ndarray): The pressure field.
-        grid_size (int): Number of cells along one dimension of the computational grid.
-        grid_spacing (float): Grid spacing.
-        time_step (float): Time step.
-        rho (float): Fluid density.
-        boundary_conditions (callable): Function to enforce boundary conditions on vu and vv.
+    :param horizontal_field: 2D array representing the horizontal velocity component (u).
+    :param vertical_field: 2D array representing the vertical velocity component (v).
+    :param pressure: The pressure field.
+    :param grid_size: Number of cells along one dimension of the computational grid.
+    :param grid_spacing: Grid spacing.
+    :param time_step: Time step.
+    :param rho: Fluid density.
+    :param boundary_conditions: Function to enforce boundary conditions on vu and vv.
+
+    :return: None
     """
     start_time = time()
     for i in range(1, grid_size + 1):
@@ -238,18 +241,16 @@ def apply_pressure_correction(horizontal_field, vertical_field, pressure, grid_s
     print(f"\t(apply_pressure_correction)->\t{end_time - start_time:.4f} seconds")
 
 
-def compute_horizontal_velocity(horizontal_field, grid_size):
+def compute_horizontal_velocity(horizontal_field: np.ndarray) -> np.ndarray:
     """
     Computes the cell-centered horizontal velocity from the staggered grid.
 
-    Parameters:
-        horizontal_field (np.ndarray): The horizontal velocity component (u).
-        grid_size (int): Number of cells along one dimension of the computational grid.
+    :param horizontal_field: The horizontal velocity component (u).
 
-    Returns:
-        np.ndarray: The cell-centered horizontal velocity.
+    :return: The cell-centered horizontal velocity.
     """
     start_time = time()
+    grid_size = horizontal_field.shape[0] - 2
     horizontal_velocity = np.zeros((grid_size, grid_size))
     for i in range(grid_size):
         for j in range(grid_size):
@@ -260,18 +261,16 @@ def compute_horizontal_velocity(horizontal_field, grid_size):
     return horizontal_velocity
 
 
-def compute_vertical_velocity(vertical_field, grid_size):
+def compute_vertical_velocity(vertical_field: np.ndarray) -> np.ndarray:
     """
     Computes the cell-centered vertical velocity from the staggered grid.
 
-    Parameters:
-        vertical_field (np.ndarray): The vertical velocity component (v).
-        grid_size (int): Number of cells along one dimension of the computational grid.
+    :param vertical_field: The vertical velocity component (v).
 
-    Returns:
-        np.ndarray: The cell-centered vertical velocity.
+    :return: The cell-centered vertical velocity.
     """
     start_time = time()
+    grid_size = vertical_field.shape[1] - 2
     vertical_velocity = np.zeros((grid_size, grid_size))
     for i in range(grid_size):
         for j in range(grid_size):
@@ -279,6 +278,18 @@ def compute_vertical_velocity(vertical_field, grid_size):
     end_time = time()
     print(f"\t(compute_vertical_velocity)->\t{end_time - start_time:.4f} seconds")
     return vertical_velocity
+
+
+def compute_velocity(horizontal_velocity: np.ndarray, vertical_velocity: np.ndarray) -> np.ndarray:
+    """
+    Computes the magnitude of the velocity field.
+
+    :param horizontal_velocity: The horizontal velocity component (u).
+    :param vertical_velocity: The vertical velocity component (v).
+
+    :return: The magnitude of the velocity field.
+    """
+    return np.sqrt(horizontal_velocity ** 2 + vertical_velocity ** 2)
 
 
 def visualize_pressure_correction(horizontal_field, vertical_field, pressure, grid_size, grid_spacing, time_step, rho, boundary_conditions):
@@ -299,8 +310,8 @@ def visualize_pressure_correction(horizontal_field, vertical_field, pressure, gr
     start_time = time()
     # Compute initial divergence and velocity magnitude
     divergence_before = compute_divergence(horizontal_field, vertical_field, grid_size, grid_spacing)
-    vel_u_initial = compute_horizontal_velocity(horizontal_field, grid_size)
-    vel_v_initial = compute_vertical_velocity(vertical_field, grid_size)
+    vel_u_initial = compute_horizontal_velocity(horizontal_field)
+    vel_v_initial = compute_vertical_velocity(vertical_field)
     velocity_magnitude_initial = np.sqrt(vel_u_initial ** 2 + vel_v_initial ** 2)
 
     # Set up grid for plotting
@@ -325,8 +336,8 @@ def visualize_pressure_correction(horizontal_field, vertical_field, pressure, gr
 
     # Compute updated divergence and velocity magnitude
     divergence_after = compute_divergence(u, v, grid_size, grid_spacing)
-    vel_u_final = compute_horizontal_velocity(u, grid_size)
-    vel_v_final = compute_vertical_velocity(v, grid_size)
+    vel_u_final = compute_horizontal_velocity(u)
+    vel_v_final = compute_vertical_velocity(v)
     velocity_magnitude_final = np.sqrt(vel_u_final ** 2 + vel_v_final ** 2)
 
     # Plot updated divergence and velocity fields
