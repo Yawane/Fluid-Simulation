@@ -3,85 +3,114 @@ import matplotlib.pyplot as plt
 
 
 def boundary(nu, nv):
-    # boundery condition (no-stick)
+    # boundary condition (no-stick)
     nu[0, :] = nu[1, :]
     nu[-1, :] = nu[-2, :]
 
-    # boundery conditions (no-stick)
+    # boundary conditions (no-stick)
     nv[:, 0] = nv[:, 1]
     nv[:, -1] = nv[:, -2]
 
 
-def advection(vu, vv):
+def interpolate(field, pos, delta, max_index):
+    """
+    Interpolate the value of the field at a given position.
+    """
+    index = int(pos // delta)
+    weight = (pos % delta) / delta
 
-    nu = np.zeros_like(vu)
-    nv = np.zeros_like(vv)
+    if index >= max_index:  # Avoid out-of-bound interpolation
+        return field[index]
+    return (1 - weight) * field[index] + weight * field[index + 1]
 
-    # u-component
-    m, n = vu.shape
-    for i in range(1, m - 1):
-        for j in range(n):
-            # fluid advection
-            if vu[i, j] == 0:
-                nu[i, j] = 0
-                continue
-            xg = j * dx
-            xp = max(xg - vu[i, j] * dt, 0)
-            xp = min(xp, (n - 1) * dx)
-            nj = int((xp - xp % dx) / dx)
-            if xp % dx == 0:
-                nu[i, j] = vu[i, nj]
-                continue
-            p = xp / dx - nj
-            nu[i, j] = (1 - p) * vu[i, nj] + p * vu[i, nj + 1]
-    # boundery condition (no-stick)
-    # nu[0, :] = nu[1, :]
-    # nu[-1, :] = nu[-2, :]
+def advect_component(field, delta_x, delta_t, axis_size):
+    """
+    Perform the advection for a single velocity component (field = u or v).
+    """
+    new_field = np.zeros_like(field)
+    m, n = field.shape
+    is_horizontal = True if m < n else False
 
-    # v-component
-    m, n = vv.shape
-    for i in range(m):
-        for j in range(1, n - 1):
-            # fluid advection
-            if vv[i, j] == 0:
-                nv[i, j] = 0
+    for i in range(0 if is_horizontal else 1, m if is_horizontal else m - 1):
+        for j in range(1 if is_horizontal else 0, n - 1 if is_horizontal else n):
+            if field[i, j] == 0:
                 continue
-            yg = i * dy
-            yp = max(yg - vv[i, j] * dt, 0)
-            yp = min(yp, (m - 1) * dy)
-            ni = int((yp - yp % dy) / dy)
-            if yp % dy == 0:
-                nv[i, j] = vv[ni, j]
-                continue
-            p = yp / dy - ni
-            nv[i, j] = (1 - p) * vv[ni, j] + p * vv[ni + 1, j]
-    # boundery conditions (no-stick)
-    # nv[:, 0] = nv[:, 1]
-    # nv[:, -1] = nv[:, -2]
 
+            # Compute the position of the particle back in time
+            grid_pos = (i if is_horizontal else j) * delta_x
+            advected_pos = max(grid_pos - field[i, j] * delta_t, 0)
+            advected_pos = min(advected_pos, (axis_size - 1) * delta_x)
+
+            # Interpolation
+            if not is_horizontal:
+                new_field[i, j] = interpolate(field[i, :], advected_pos, delta_x, n - 1)
+            else:
+                new_field[i, j] = interpolate(field[:, j], advected_pos, delta_x, m - 1)
+
+    return new_field
+
+def advection(vu, vv, delta_x, delta_y, delta_t):
+    """
+    Perform the advection step for velocity components vu and vv.
+    """
+    nu = advect_component(vu, delta_x, delta_t, vu.shape[1])
+    nv = advect_component(vv, delta_y, delta_t, vv.shape[0])
+
+    # Apply boundary conditions
     boundary(nu, nv)
     return nu, nv
 
 
-def pressure_gradient(vu, vv):
-    # Get A matrix
-    A = np.zeros((size ** 2, size ** 2))
-    A -= -np.diag(np.ones(size ** 2)) * 4 + np.diag(np.ones(size ** 2 - 1), 1) + np.diag(np.ones(size ** 2 - 1),
-                                                                                         -1) + np.diag(
-        np.ones(size ** 2 - size), -size) + np.diag(np.ones(size ** 2 - size), size)
-    for i in range(size, size ** 2, size):
-        A[i, i - 1] = 0
+def build_matrix_A(size):
+    """
+    Build the sparse matrix A for the pressure gradient calculation.
+    """
+    n = size ** 2
+    A = np.zeros((n, n))
 
-    # Get b vector
+    # Main diagonal (-4)
+    np.fill_diagonal(A, -4)
+
+    # Off-diagonals for neighbors
+    np.fill_diagonal(A[1:], 1)  # Right neighbor
+    np.fill_diagonal(A[:, 1:], 1)  # Left neighbor
+    np.fill_diagonal(A[size:], 1)  # Bottom neighbor
+    np.fill_diagonal(A[:, size:], 1)  # Top neighbor
+
+    # Zero out periodic connections in rows
+    for i in range(size, n, size):
+        A[i, i - 1] = 0
+        A[i - 1, i] = 0
+
+    return A
+
+
+def build_vector_b(vu, vv, size):
+    """
+    Build the vector b from the velocity fields.
+    """
     b = np.zeros(size ** 2)
     for j in range(size):
         for i in range(size):
-            b[i + j * size] = vu[i + 1, j] - vu[i + 1, j + 1] + vv[i, j + 1] - vv[i + 1, j + 1]
+            b[i + j * size] = (
+                vu[i + 1, j] - vu[i + 1, j + 1] +
+                vv[i, j + 1] - vv[i + 1, j + 1]
+            )
+    return b
 
-    p = np.zeros((size + 2, size + 2))
-    p[1:-1, 1:-1] = np.linalg.solve(dt / (rho * dx) * A, b).reshape((size, size), order='F')
 
-    return p
+def pressure_gradient(vu, vv, size, delta_x, delta_t, rho):
+    """
+    Compute the pressure gradient correction term.
+    """
+    A = build_matrix_A(size)
+    b = build_vector_b(vu, vv, size)
+
+    # Solve for delta_p
+    delta_p = np.zeros((size + 2, size + 2)) # with boundaries
+    delta_p[1:-1, 1:-1] = np.linalg.solve((delta_t / (rho * delta_x)) * A, b).reshape((size, size), order='F') # without boundaries
+
+    return delta_p
 
 
 def check_divergence(vu, vv):
@@ -178,8 +207,8 @@ if __name__ == "__main__":
     dt = dx / (2 * max(np.max(u), np.max(v)))
     print("dt:", dt)
 
-    new_u, new_v = advection(u, v)
+    new_u, new_v = advection(u, v, dx, dx, dt)
 
-    p = pressure_gradient(u, v)
+    p = pressure_gradient(u, v, size, dx, dt, rho)
 
     show_pressure_gradient(u, v)
