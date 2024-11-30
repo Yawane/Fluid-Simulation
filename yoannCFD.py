@@ -292,6 +292,11 @@ def compute_velocity(horizontal_velocity: np.ndarray, vertical_velocity: np.ndar
     return np.sqrt(horizontal_velocity ** 2 + vertical_velocity ** 2)
 
 
+def apply_external_forces(vertical_field: np.ndarray, vertical_force: np.ndarray, horizontal_field: np.ndarray, horizontal_force: np.ndarray, dt: float) -> None:
+    vertical_field += vertical_force * dt
+    horizontal_field += horizontal_force * dt
+
+
 def visualize_pressure_correction(horizontal_field, vertical_field, pressure, grid_size, grid_spacing, time_step, rho, boundary_conditions):
     """
     Visualizes the effects of pressure correction on the velocity and divergence fields.

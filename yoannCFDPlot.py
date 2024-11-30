@@ -3,25 +3,26 @@ import matplotlib.pyplot as plt
 
 
 
-def plot_velocity_field(velocity_field: np.ndarray, grid_spacing: float) -> None:
+def plot_field(field: np.ndarray, grid_spacing: float) -> None:
     """
     Display the velocity field using matplotlib.pcolormesh
 
-    :param velocity_field: 2D array of real velocity field
+    :param field: 2D array of real velocity field
     :param grid_spacing: Spacing between grid points.
+
     :return: None
     """
-    m, n = velocity_field.shape
+    m, n = field.shape
     x = np.arange(n) * grid_spacing
     y = np.arange(m) * grid_spacing
     X, Y = np.meshgrid(x, y)
 
-    plt.figure(figsize=(8, 6))
-    plt.pcolormesh(X, Y, velocity_field)
-    plt.title("Velocity field")
+    plt.pcolormesh(X, Y, field)
+    plt.colorbar()
+    plt.title("Field")
     plt.xlabel("X")
     plt.ylabel("Y")
-    plt.axis("equal")
+    # plt.axis("equal")
     plt.show()
 
 
