@@ -9,23 +9,30 @@ if __name__ == "__main__":
     dx = .1
     rho = 1000
     current_time = 0.0
-    dt = .01
+    dt = .04
 
     u = np.zeros((size + 2, size + 1)).astype('float64')
     v = np.zeros((size + 1, size + 2)).astype('float64')
+
+    walls = np.zeros((size, size)).astype('int16')
+    top_left = (size//2 - 5, size//4 - 5)  # Row 2, Column 3
+    bottom_right = (size//2 + 5, size//4 + 5)  # Row 6, Column 8
+
+    # Fill the rectangle with 1s
+    walls[top_left[0]:bottom_right[0] + 1, top_left[1]:bottom_right[1] + 1] = 1
 
     plt.figure(figsize=(19, 10))
     x = np.arange(size) * dx
     X, Y = np.meshgrid(x, x)
 
-    n = 100
+    n = 200
     for i in range(n):
         # vertical field
         vel_u = compute_horizontal_velocity(u)
         vel_v = compute_vertical_velocity(v)
 
         # plt.subplot(121)
-        plt.pcolormesh(X, Y, vel_u, cmap='jet', vmin=0)
+        plt.pcolormesh(X, Y, np.sqrt(vel_u**2 + vel_v**2), cmap='jet', vmin=0)
         # plt.pcolormesh(X, Y, compute_horizontal_velocity(u), cmap='jet', vmin=-2, vmax=3)
         plt.colorbar()
         plt.title(f"Time: {current_time:.3f}")
@@ -42,8 +49,12 @@ if __name__ == "__main__":
         # next step
         u, v = advection(u, v, dx, dx, dt)
         # adding external force
-        horizontal_force, vertical_force = np.zeros_like(u), np.zeros_like(v) + 9.81
-        u[u.shape[0]//2, 0] = 1
+        horizontal_force, vertical_force = np.zeros_like(u), np.zeros_like(v) + 0
+        u[3 * u.shape[0]//8, 0] = 1
+        u[3 * u.shape[0]//8, -1] = -1
+        # u[u.shape[0]//2, -1] = -1
+        # v[3 * v.shape[0]//8, 1] = 1
+
 
         apply_external_forces(v, vertical_force, u, horizontal_force, dt)
         p = pressure_gradient(u, v, size, dx, dt, rho)

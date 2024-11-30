@@ -111,6 +111,7 @@ def build_matrix_A(grid_size: int) -> np.ndarray:
     """
     Build the sparse matrix A for the pressure gradient calculation.
 
+    :param walls: 1 for a wall, 0 for nothing
     :param grid_size: Number of grid points along one axis.
 
     :return: matrix A
