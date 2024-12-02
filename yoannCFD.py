@@ -15,7 +15,6 @@ def apply_boundary_conditions(horizontal_field: np.ndarray, vertical_field: np.n
         horizontal_field: Updates the boundary rows to match the adjacent interior rows.
         vertical_field: Updates the boundary columns to match the adjacent interior columns.
     """
-    start_time = time()
     # boundary condition (no-stick)
     horizontal_field[0, :] = horizontal_field[1, :]
     horizontal_field[-1, :] = horizontal_field[-2, :]
@@ -23,8 +22,6 @@ def apply_boundary_conditions(horizontal_field: np.ndarray, vertical_field: np.n
     # boundary conditions (no-stick)
     vertical_field[:, 0] = vertical_field[:, 1]
     vertical_field[:, -1] = vertical_field[:, -2]
-    end_time = time()
-    print(f"\t(apply_boundary_conditions)->\t{end_time - start_time:.4f} seconds")
 
 
 def interpolate(field: np.ndarray, position: float, grid_spacing: float, max_index: int) -> np.ndarray:
@@ -57,7 +54,6 @@ def advect_component(field: np.ndarray, grid_spacing: float, time_step: float, a
 
     :return: Updated velocity component after advection.
     """
-    start_time = time()
     new_field = np.zeros_like(field)
     m, n = field.shape
     is_horizontal = False if m < n else True
@@ -78,12 +74,10 @@ def advect_component(field: np.ndarray, grid_spacing: float, time_step: float, a
             else:
                 new_field[i, j] = interpolate(field[:, j], advected_pos, grid_spacing, m - 1)
 
-    end_time = time()
-    print(f"\t(advect_component)->\t{end_time - start_time:.4f} seconds")
     return new_field
 
 
-def advection(horizontal_field: np.ndarray, vertical_field: np.ndarray, grid_spacing: float, delta_y: float, time_step: float) -> tuple:
+def test_advection(horizontal_field: np.ndarray, vertical_field: np.ndarray, grid_spacing: float, delta_y: float, time_step: float) -> tuple:
     """
     Perform the advection step for horizontal and vertical velocity fields.
 
@@ -96,6 +90,7 @@ def advection(horizontal_field: np.ndarray, vertical_field: np.ndarray, grid_spa
 
         :return: Updated (horizontal_field, vertical_field) after advection.
     """
+    # TODO: Particles moves horizontally and vertically only. The advection should integrate using the mean velocity value.
     start_time = time()
     nu = advect_component(horizontal_field, grid_spacing, time_step, horizontal_field.shape[1])
     nv = advect_component(vertical_field, delta_y, time_step, vertical_field.shape[0])
@@ -103,20 +98,103 @@ def advection(horizontal_field: np.ndarray, vertical_field: np.ndarray, grid_spa
     # Apply boundary conditions
     apply_boundary_conditions(nu, nv)
     end_time = time()
-    print(f"\t(advection)->\t{end_time - start_time:.4f} seconds")
+    print(f"\t(test_advection)->\t{end_time - start_time:.4f} seconds")
     return nu, nv
+
+
+def get_hypotenuse(distance1: float, distance2: float) -> float:
+    return np.sqrt(distance1**2 + distance2**2)
+
+
+def advection(horizontal_field: np.ndarray, vertical_field: np.ndarray, grid_spacing_x: float, grid_spacing_y: float, time_step: float) -> tuple:
+    #TODO: advect u and v at the same time. u and v should both move in 2D space.
+    start_time = time()
+    new_horizontal_field = np.zeros_like(horizontal_field)
+    new_vertical_field = np.zeros_like(vertical_field)
+
+    # Advect horizontal_field
+    for i in range(1, horizontal_field.shape[0] - 1):
+        for j in range(horizontal_field.shape[1]):
+            u = horizontal_field[i, j].item()
+            v = .25 * np.sum(vertical_field[i-1:i+1, j:j+2])
+            xG = max(0., min(grid_spacing_x*(horizontal_field.shape[1] - 1), grid_spacing_x*j - u*time_step))
+            yG = max(0., min(grid_spacing_y*(vertical_field.shape[0] - 1), grid_spacing_y*(i - .5) - v*time_step))
+            # print(f"({xG:.2f}, {yG:.2f})")
+
+            jx = int(np.floor(xG % grid_spacing_x))
+            iy = int(np.floor(yG % grid_spacing_y))
+            # TODO: Find how to get if i index with the y-axis
+
+            d0 = get_hypotenuse(xG - jx, yG - iy)
+            d1 = get_hypotenuse(xG - jx + grid_spacing_x, yG - iy)
+            d2 = get_hypotenuse(xG - jx, yG - iy + grid_spacing_y)
+            d3 = get_hypotenuse(xG - jx + grid_spacing_x, yG - iy + grid_spacing_y)
+            weight = d0 + d1 + d2 + d3
+            # print(d0, d1, d2, d3, "\t", weight)
+
+            new_horizontal_field[i, j] = (
+                                             d0 * horizontal_field[jx, iy] +
+                                             d1 * horizontal_field[jx, iy + 1] +
+                                             d2 * horizontal_field[jx + 1, iy] +
+                                             d3 * horizontal_field[jx + 1, iy + 1]
+                                     ) / weight
+
+    # Advect vertical field
+    for i in range(vertical_field.shape[0]):
+        for j in range(1, vertical_field.shape[1]-1):
+            v = vertical_field[i, j].item()
+            u = .25 * np.sum(horizontal_field[i:i+2, j-1:j+1])
+            xG = max(0., min(grid_spacing_x * (horizontal_field.shape[1] - 1), grid_spacing_x * (j - .5) - u * time_step))
+            yG = max(0., min(grid_spacing_y * (vertical_field.shape[0] - 1), grid_spacing_y * i - v * time_step))
+
+            jx = int(np.floor(xG % grid_spacing_x))
+            iy = int(np.floor(yG % grid_spacing_y))
+
+            d0 = get_hypotenuse(xG - jx, yG - iy)
+            d1 = get_hypotenuse(xG - jx + grid_spacing_x, yG - iy)
+            d2 = get_hypotenuse(xG - jx, yG - iy + grid_spacing_y)
+            d3 = get_hypotenuse(xG - jx + grid_spacing_x, yG - iy + grid_spacing_y)
+            weight = d0 + d1 + d2 + d3
+
+            new_vertical_field[i, j] = (
+                d0 * vertical_field[jx, iy] +
+                d1 * vertical_field[jx, iy + 1] +
+                d2 * vertical_field[jx + 1, iy] +
+                d3 * vertical_field[jx + 1, iy + 1]
+            ) / weight
+
+    end_time = time()
+    print(f"\t(advection)->\t{end_time - start_time:.4f} seconds")
+    apply_boundary_conditions(new_horizontal_field, new_vertical_field)
+    return new_horizontal_field, new_vertical_field
+
+if __name__ == "__main__":
+    size = 2**2
+    dx = dy = .1
+    dt = .5
+    u = np.random.randint(-3, 3, size=(size+2, size+1)).astype("float64")
+    v = np.random.randint(-3, 3, size=(size+1, size+2)).astype("float64")
+    apply_boundary_conditions(u, v)
+    print(u)
+    print()
+    print(v)
+    print("-"*20)
+
+    nu, nv = advection(u, v, dx, dy, dt)
+
+    print(np.round(nu, 4))
+    print()
+    print(np.round(nv, 4))
 
 
 def build_matrix_A(grid_size: int) -> np.ndarray:
     """
     Build the sparse matrix A for the pressure gradient calculation.
 
-    :param walls: 1 for a wall, 0 for nothing
     :param grid_size: Number of grid points along one axis.
 
     :return: matrix A
     """
-    start_time = time()
     n = grid_size ** 2
     A = np.zeros((n, n), dtype='int32')
 
@@ -132,9 +210,6 @@ def build_matrix_A(grid_size: int) -> np.ndarray:
     # Zero out periodic connections in rows
     for i in range(grid_size, n, grid_size):
         A[i, i - 1] = 0
-
-    end_time = time()
-    print(f"\t(build_matrix_A)->\t{end_time - start_time:.4f} seconds")
     return A
 
 
@@ -148,7 +223,6 @@ def build_vector_b(horizontal_field: np.ndarray, vertical_field: np.ndarray, gri
 
     :return: vector b
     """
-    start_time = time()
     b = np.zeros(grid_size ** 2, dtype='float64')
     for j in range(grid_size):
         for i in range(grid_size):
@@ -156,8 +230,6 @@ def build_vector_b(horizontal_field: np.ndarray, vertical_field: np.ndarray, gri
                     horizontal_field[i + 1, j] - horizontal_field[i + 1, j + 1] +
                     vertical_field[i, j + 1] - vertical_field[i + 1, j + 1]
             )
-    end_time = time()
-    print(f"\t(build_vector_b)->\t{end_time - start_time:.4f} seconds")
     return b
 
 
@@ -211,7 +283,7 @@ def compute_divergence(horizontal_field: np.ndarray, vertical_field: np.ndarray,
     return divergence
 
 
-def apply_pressure_correction(horizontal_field: np.ndarray, vertical_field: np.ndarray, pressure: np.ndarray, grid_size: int, grid_spacing: float, time_step: float,
+def apply_pressure_correction(horizontal_field: np.ndarray, vertical_field: np.ndarray, grid_size: int, grid_spacing: float, time_step: float,
                               rho: float,
                               boundary_conditions: callable) -> None:
     """
@@ -219,7 +291,6 @@ def apply_pressure_correction(horizontal_field: np.ndarray, vertical_field: np.n
 
     :param horizontal_field: 2D array representing the horizontal velocity component (u).
     :param vertical_field: 2D array representing the vertical velocity component (v).
-    :param pressure: The pressure field.
     :param grid_size: Number of cells along one dimension of the computational grid.
     :param grid_spacing: Grid spacing.
     :param time_step: Time step.
@@ -228,7 +299,7 @@ def apply_pressure_correction(horizontal_field: np.ndarray, vertical_field: np.n
 
     :return: None
     """
-    start_time = time()
+    pressure = pressure_gradient(horizontal_field, vertical_field, grid_size, grid_spacing, time_step, rho)
     for i in range(1, grid_size + 1):
         for j in range(grid_size + 1):
             horizontal_field[i, j] += time_step / (rho * grid_spacing) * (pressure[i, j + 1] - pressure[i, j])
@@ -238,8 +309,6 @@ def apply_pressure_correction(horizontal_field: np.ndarray, vertical_field: np.n
             vertical_field[i, j] += time_step / (rho * grid_spacing) * (pressure[i + 1, j] - pressure[i, j])
 
     boundary_conditions(horizontal_field, vertical_field)
-    end_time = time()
-    print(f"\t(apply_pressure_correction)->\t{end_time - start_time:.4f} seconds")
 
 
 def compute_horizontal_velocity(horizontal_field: np.ndarray) -> np.ndarray:
@@ -250,15 +319,12 @@ def compute_horizontal_velocity(horizontal_field: np.ndarray) -> np.ndarray:
 
     :return: The cell-centered horizontal velocity.
     """
-    start_time = time()
     grid_size = horizontal_field.shape[0] - 2
     horizontal_velocity = np.zeros((grid_size, grid_size))
     for i in range(grid_size):
         for j in range(grid_size):
             horizontal_velocity[i, j] = (horizontal_field[i + 1, j + 1] + horizontal_field[i + 1, j]) / 2
 
-    end_time = time()
-    print(f"\t(compute_horizontal_velocity)->\t{end_time - start_time:.4f} seconds")
     return horizontal_velocity
 
 
@@ -270,14 +336,11 @@ def compute_vertical_velocity(vertical_field: np.ndarray) -> np.ndarray:
 
     :return: The cell-centered vertical velocity.
     """
-    start_time = time()
     grid_size = vertical_field.shape[1] - 2
     vertical_velocity = np.zeros((grid_size, grid_size))
     for i in range(grid_size):
         for j in range(grid_size):
             vertical_velocity[i, j] = (vertical_field[i + 1, j + 1] + vertical_field[i, j + 1]) / 2
-    end_time = time()
-    print(f"\t(compute_vertical_velocity)->\t{end_time - start_time:.4f} seconds")
     return vertical_velocity
 
 
@@ -338,7 +401,7 @@ def visualize_pressure_correction(horizontal_field, vertical_field, pressure, gr
     plt.title("Pressure Field")
 
     # Apply pressure correction
-    apply_pressure_correction(u, v, pressure, grid_size, grid_spacing, time_step, rho, boundary_conditions)
+    apply_pressure_correction(u, v, grid_size, grid_spacing, time_step, rho, boundary_conditions)
 
     # Compute updated divergence and velocity magnitude
     divergence_after = compute_divergence(u, v, grid_size, grid_spacing)
