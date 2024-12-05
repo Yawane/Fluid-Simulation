@@ -9,7 +9,7 @@ if __name__ == "__main__":
     dx = dy = .1
     rho = 1000
     current_time = 0.0
-    dt = .005
+    dt = .01
 
     u = np.zeros((size + 2, size + 1)).astype('float64')
     v = np.zeros((size + 1, size + 2)).astype('float64')
@@ -26,15 +26,16 @@ if __name__ == "__main__":
     y = np.arange(size, 0, -1) * dy
     X, Y = np.meshgrid(x, y)
 
-    n = 200
+    n = 150
     for i in range(n):
         # vertical field
         vel_u = compute_horizontal_velocity(u)
         vel_v = compute_vertical_velocity(v)
+        vel = np.sqrt(vel_u**2 + vel_v**2)
 
         # plt.subplot(121)
-        plt.pcolormesh(X, Y, np.sqrt(vel_u**2 + vel_v**2), cmap='jet', vmin=0)
-        # plt.pcolormesh(X, Y, compute_horizontal_velocity(u), cmap='jet', vmin=-2, vmax=3)
+        plt.pcolormesh(X, Y, vel, cmap='jet', vmin=0, vmax=3.5)
+        # plt.pcolormesh(X, Y, vel_u, cmap='jet')
         plt.colorbar()
         plt.title(f"Time: {current_time:.3f}")
         plt.axis('equal')
@@ -48,13 +49,14 @@ if __name__ == "__main__":
         # plt.colorbar()
 
         # next step
+        # dt = min(dx / np.max(vel), dx**2 / (4*1.5e-5)) if current_time > .01 else .01
         u, v = advection(u, v, dx, dx, dt)
         # adding external force
         horizontal_force, vertical_force = np.zeros_like(u), np.zeros_like(v)
         # u[1 * u.shape[0]//2, 0] = 1
         # u[3 * u.shape[0]//8 + 2, -1] = -1
-        u[1, 0:1] = 1 if current_time < .2 else -1
-        v[0:1, 1] = 1 if current_time < .2 else -1
+        u[1, 0:2] = 1
+        v[0:2, 1] = 1
 
 
         apply_external_forces(v, vertical_force, u, horizontal_force, dt)
