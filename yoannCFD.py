@@ -109,7 +109,7 @@ def advection(horizontal_field: np.ndarray, vertical_field: np.ndarray, grid_spa
     start_time = time()
     new_horizontal_field = np.zeros_like(horizontal_field)
     new_vertical_field = np.zeros_like(vertical_field)
-
+    # TODO: Why the fluid goes down better than up?
     # Advect horizontal_field
     for i in range(1, horizontal_field.shape[0] - 1):
         for j in range(horizontal_field.shape[1]):
@@ -121,7 +121,7 @@ def advection(horizontal_field: np.ndarray, vertical_field: np.ndarray, grid_spa
 
             jx = int((xG - xG % grid_spacing_x) // grid_spacing_x)
             iy = int((yG + grid_spacing_y/2 - (yG + grid_spacing_y/2) % grid_spacing_y) // grid_spacing_y)
-            # TODO: Find how to get if i index with the y-axis
+
             # print(xG, jx)
 
             # placement conditions
