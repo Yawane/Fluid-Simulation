@@ -6,10 +6,10 @@ import matplotlib.animation as animation
 
 if __name__ == "__main__":
     size = 2**5
-    dx = .1
+    dx = dy = .1
     rho = 1000
     current_time = 0.0
-    dt = .04
+    dt = .005
 
     u = np.zeros((size + 2, size + 1)).astype('float64')
     v = np.zeros((size + 1, size + 2)).astype('float64')
@@ -23,7 +23,8 @@ if __name__ == "__main__":
 
     plt.figure(figsize=(19, 10))
     x = np.arange(size) * dx
-    X, Y = np.meshgrid(x, x)
+    y = np.arange(size, 0, -1) * dy
+    X, Y = np.meshgrid(x, y)
 
     n = 200
     for i in range(n):
@@ -49,16 +50,15 @@ if __name__ == "__main__":
         # next step
         u, v = advection(u, v, dx, dx, dt)
         # adding external force
-        horizontal_force, vertical_force = np.zeros_like(u), np.zeros_like(v) + 0
-        u[3 * u.shape[0]//8, 0] = 1
-        u[3 * u.shape[0]//8, -1] = -1
-        # u[u.shape[0]//2, -1] = -1
-        # v[3 * v.shape[0]//8, 1] = 1
+        horizontal_force, vertical_force = np.zeros_like(u), np.zeros_like(v)
+        # u[1 * u.shape[0]//2, 0] = 1
+        # u[3 * u.shape[0]//8 + 2, -1] = -1
+        u[1, 0:1] = 1 if current_time < .2 else -1
+        v[0:1, 1] = 1 if current_time < .2 else -1
 
 
         apply_external_forces(v, vertical_force, u, horizontal_force, dt)
-        p = pressure_gradient(u, v, size, dx, dt, rho)
-        apply_pressure_correction(u, v, p, size, dx, dt, rho, apply_boundary_conditions)
+        apply_pressure_correction(u, v, size, dx, dt, rho, apply_boundary_conditions)
         current_time += dt
 
         plt.show()

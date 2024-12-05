@@ -116,7 +116,7 @@ def advection(horizontal_field: np.ndarray, vertical_field: np.ndarray, grid_spa
     for i in range(1, horizontal_field.shape[0] - 1):
         for j in range(horizontal_field.shape[1]):
             u = horizontal_field[i, j].item()
-            print(u)
+            # print(u)
             v = .25 * np.sum(vertical_field[i-1:i+1, j:j+2])
             xG = max(0., min(grid_spacing_x*(horizontal_field.shape[1] - 1), grid_spacing_x*j - u*time_step))
             yG = max(0., min(grid_spacing_y*(vertical_field.shape[0] - 1), grid_spacing_y*(i - .5) - v*time_step))
@@ -128,8 +128,8 @@ def advection(horizontal_field: np.ndarray, vertical_field: np.ndarray, grid_spa
             # print(xG, jx)
 
             if xG % grid_spacing_x == 0: # lorsque il doit répartir entre le bas et le haut uniquement
-                d0 = None
-                d1 = None
+                d0 = .5
+                d1 = .5
                 weight = d0 + d1
                 new_horizontal_field[i, j] = (
                     d0 * horizontal_field[iy, jx] +
@@ -161,18 +161,27 @@ def advection(horizontal_field: np.ndarray, vertical_field: np.ndarray, grid_spa
             jx = int((xG - xG % grid_spacing_x) // grid_spacing_x)
             iy = int((yG - yG % grid_spacing_y) // grid_spacing_y)
 
-            d0 = get_hypotenuse(xG - jx, yG - iy)
-            d1 = get_hypotenuse(xG - jx + grid_spacing_x, yG - iy)
-            d2 = get_hypotenuse(xG - jx, yG - iy + grid_spacing_y)
-            d3 = get_hypotenuse(xG - jx + grid_spacing_x, yG - iy + grid_spacing_y)
-            weight = d0 + d1 + d2 + d3
+            if yG % grid_spacing_x == 0: # lorsque il doit répartir entre droite et gauche uniquement
+                d0 = .5
+                d1 = .5
+                weight = d0 + d1
+                new_vertical_field[i, j] = (
+                    d0 * vertical_field[iy, jx] +
+                    d1 * vertical_field[iy, jx + 1]
+                ) / weight
+            else:
+                d0 = get_hypotenuse(xG - jx, yG - iy)
+                d1 = get_hypotenuse(xG - jx + grid_spacing_x, yG - iy)
+                d2 = get_hypotenuse(xG - jx, yG - iy + grid_spacing_y)
+                d3 = get_hypotenuse(xG - jx + grid_spacing_x, yG - iy + grid_spacing_y)
+                weight = d0 + d1 + d2 + d3
 
-            new_vertical_field[i, j] = (
-                                               d0 * vertical_field[iy, jx] +
-                                               d1 * vertical_field[iy, jx + 1] +
-                                               d2 * vertical_field[iy + 1, jx] +
-                                               d3 * vertical_field[iy + 1, jx + 1]
-                                    ) / weight
+                new_vertical_field[i, j] = (
+                                                   d0 * vertical_field[iy, jx] +
+                                                   d1 * vertical_field[iy, jx + 1] +
+                                                   d2 * vertical_field[iy + 1, jx] +
+                                                   d3 * vertical_field[iy + 1, jx + 1]
+                                        ) / weight
 
     end_time = time()
     print(f"\t(advection)->\t{end_time - start_time:.4f} seconds")
