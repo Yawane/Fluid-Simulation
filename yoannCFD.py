@@ -90,7 +90,6 @@ def test_advection(horizontal_field: np.ndarray, vertical_field: np.ndarray, gri
 
         :return: Updated (horizontal_field, vertical_field) after advection.
     """
-    # TODO: Particles moves horizontally and vertically only. The advection should integrate using the mean velocity value.
     start_time = time()
     nu = advect_component(horizontal_field, grid_spacing, time_step, horizontal_field.shape[1])
     nv = advect_component(vertical_field, delta_y, time_step, vertical_field.shape[0])
@@ -107,7 +106,6 @@ def get_hypotenuse(distance1: float, distance2: float) -> float:
 
 
 def advection(horizontal_field: np.ndarray, vertical_field: np.ndarray, grid_spacing_x: float, grid_spacing_y: float, time_step: float) -> tuple:
-    #TODO: advect u and v at the same time. u and v should both move in 2D space.
     start_time = time()
     new_horizontal_field = np.zeros_like(horizontal_field)
     new_vertical_field = np.zeros_like(vertical_field)
@@ -116,39 +114,49 @@ def advection(horizontal_field: np.ndarray, vertical_field: np.ndarray, grid_spa
     for i in range(1, horizontal_field.shape[0] - 1):
         for j in range(horizontal_field.shape[1]):
             u = horizontal_field[i, j].item()
-            # print(u)
             v = .25 * np.sum(vertical_field[i-1:i+1, j:j+2])
             xG = max(0., min(grid_spacing_x*(horizontal_field.shape[1] - 1), grid_spacing_x*j - u*time_step))
             yG = max(0., min(grid_spacing_y*(vertical_field.shape[0] - 1), grid_spacing_y*(i - .5) - v*time_step))
             # print(f"({xG:.2f}, {yG:.2f})")
 
             jx = int((xG - xG % grid_spacing_x) // grid_spacing_x)
-            iy = int((yG - yG % grid_spacing_y) // grid_spacing_y) # erreur la dedans, voir To Do.
+            iy = int((yG + grid_spacing_y/2 - (yG + grid_spacing_y/2) % grid_spacing_y) // grid_spacing_y)
             # TODO: Find how to get if i index with the y-axis
             # print(xG, jx)
 
-            if xG % grid_spacing_x == 0: # lorsque il doit répartir entre le bas et le haut uniquement
-                d0 = .5
-                d1 = .5
-                weight = d0 + d1
+            # placement conditions
+            if xG % grid_spacing_x == 0: # only up and down interpolation (left border)
+                d0 = yG - grid_spacing_y * (iy - .5) # distance to the closest top node
                 new_horizontal_field[i, j] = (
-                    d0 * horizontal_field[iy, jx] +
-                    d1 * horizontal_field[iy + 1, jx]
-                ) / weight
-            else:
-                d0 = get_hypotenuse(xG - jx, yG - iy)
-                d1 = get_hypotenuse(xG - jx + grid_spacing_x, yG - iy)
-                d2 = get_hypotenuse(xG - jx, yG - iy + grid_spacing_y)
-                d3 = get_hypotenuse(xG - jx + grid_spacing_x, yG - iy + grid_spacing_y)
+                    (grid_spacing_y - d0) * horizontal_field[iy, jx] +
+                    d0 * horizontal_field[iy + 1, jx]
+                ) / grid_spacing_y
+                # print(f"{d0:.3f}")
+            elif (yG + grid_spacing_y/2) % grid_spacing_y == 0: # only left and right interpolation (top border)
+                d0 = xG - jx * grid_spacing_x # distance to the closest left node
+                new_horizontal_field[i, j] = (
+                    (grid_spacing_x - d0) * horizontal_field[iy, jx] +
+                    d0 * horizontal_field[iy, jx + 1]
+                ) / grid_spacing_x
+                # print(f"{d0:.3f}")
+            else: # when position is inside 4 closest nodes (excluding borders)
+                dx = xG - jx * grid_spacing_x
+                dy = yG - grid_spacing_y * (iy - .5)
+
+                d0 = get_hypotenuse(dx, dy)
+                d1 = get_hypotenuse(grid_spacing_x - dx, dy)
+                d2 = get_hypotenuse(dx, grid_spacing_y - dy)
+                d3 = get_hypotenuse(grid_spacing_x - dx, grid_spacing_y - dy)
                 weight = d0 + d1 + d2 + d3
-                # print(d0, d1, d2, d3, "\t", weight)
+                # print(f"{d0:.3f}\t{d1:.3f}\t{d2:.3f}\t{d3:.3f}\t\t{weight - 2.83:.3f}")
 
                 new_horizontal_field[i, j] = (
-                                                 d0 * horizontal_field[iy, jx] +
-                                                 d1 * horizontal_field[iy, jx + 1] +
-                                                 d2 * horizontal_field[iy + 1, jx] +
-                                                 d3 * horizontal_field[iy + 1, jx + 1]
-                                         ) / weight
+                    (weight - d0) * horizontal_field[iy, jx] +
+                    (weight - d1) * horizontal_field[iy, jx + 1] +
+                    (weight - d2) * horizontal_field[iy + 1, jx] +
+                    (weight - d3) * horizontal_field[iy + 1, jx + 1]
+                ) / (3*weight)
+
 
     # Advect vertical field
     for i in range(vertical_field.shape[0]):
@@ -158,53 +166,44 @@ def advection(horizontal_field: np.ndarray, vertical_field: np.ndarray, grid_spa
             xG = max(0., min(grid_spacing_x * (horizontal_field.shape[1] - 1), grid_spacing_x * (j - .5) - u * time_step))
             yG = max(0., min(grid_spacing_y * (vertical_field.shape[0] - 1), grid_spacing_y * i - v * time_step))
 
-            jx = int((xG - xG % grid_spacing_x) // grid_spacing_x)
+            jx = int((xG + grid_spacing_x/2 - (xG + grid_spacing_x/2) % grid_spacing_x) // grid_spacing_x)
             iy = int((yG - yG % grid_spacing_y) // grid_spacing_y)
 
-            if yG % grid_spacing_x == 0: # lorsque il doit répartir entre droite et gauche uniquement
-                d0 = .5
-                d1 = .5
-                weight = d0 + d1
+            if yG % grid_spacing_y == 0: # only left and  right interpolation (top border)
+                d0 = xG - grid_spacing_x * (jx - .5) # distance to the closest left node
                 new_vertical_field[i, j] = (
-                    d0 * vertical_field[iy, jx] +
-                    d1 * vertical_field[iy, jx + 1]
-                ) / weight
-            else:
-                d0 = get_hypotenuse(xG - jx, yG - iy)
-                d1 = get_hypotenuse(xG - jx + grid_spacing_x, yG - iy)
-                d2 = get_hypotenuse(xG - jx, yG - iy + grid_spacing_y)
-                d3 = get_hypotenuse(xG - jx + grid_spacing_x, yG - iy + grid_spacing_y)
+                    (grid_spacing_x - d0) * vertical_field[iy, jx] +
+                    d0 * vertical_field[iy, jx + 1]
+                ) / grid_spacing_x
+            elif (xG + grid_spacing_x/2) % grid_spacing_x == 0: # only up and down interpolation (left border)
+                d0 = yG - iy * grid_spacing_y # distance to the closest top node
+                new_vertical_field[i, j] = (
+                    (grid_spacing_y - d0) * vertical_field[iy, jx] +
+                    d0 * vertical_field[iy + 1, jx]
+                ) / grid_spacing_y
+            else: # when position is inside 4 closest nodes (excluding borders)
+                dx = xG - grid_spacing_x * (jx - .5)
+                dy = yG - iy * grid_spacing_y
+
+                d0 = get_hypotenuse(dx, dy)
+                d1 = get_hypotenuse(grid_spacing_x - dx, dy)
+                d2 = get_hypotenuse(dx, grid_spacing_y - dy)
+                d3 = get_hypotenuse(grid_spacing_x - dx, grid_spacing_y - dy)
                 weight = d0 + d1 + d2 + d3
 
                 new_vertical_field[i, j] = (
-                                                   d0 * vertical_field[iy, jx] +
-                                                   d1 * vertical_field[iy, jx + 1] +
-                                                   d2 * vertical_field[iy + 1, jx] +
-                                                   d3 * vertical_field[iy + 1, jx + 1]
-                                        ) / weight
+                        (weight - d0) * vertical_field[iy, jx] +
+                        (weight - d1) * vertical_field[iy, jx + 1] +
+                        (weight - d2) * vertical_field[iy + 1, jx] +
+                        (weight - d3) * vertical_field[iy + 1, jx + 1]
+                ) / (3*weight)
 
     end_time = time()
     print(f"\t(advection)->\t{end_time - start_time:.4f} seconds")
     apply_boundary_conditions(new_horizontal_field, new_vertical_field)
+
     return new_horizontal_field, new_vertical_field
 
-if __name__ == "__main__":
-    size = 2**2
-    dx = dy = .1
-    dt = .5
-    u = np.random.randint(-3, 3, size=(size+2, size+1)).astype("float64")
-    v = np.random.randint(-3, 3, size=(size+1, size+2)).astype("float64")
-    apply_boundary_conditions(u, v)
-    print(u)
-    print()
-    print(v)
-    print("-"*20)
-
-    nu, nv = advection(u, v, dx, dy, dt)
-
-    print(np.round(nu, 4))
-    print()
-    print(np.round(nv, 4))
 
 
 def build_matrix_A(grid_size: int) -> np.ndarray:
